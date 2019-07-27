@@ -1,0 +1,50 @@
+FROM ubuntu:bionic
+
+MAINTAINER wujohn1990<wujohn1990@126.com>
+
+ARG LEANOTE_VERSION=2.6.1
+
+ADD init.sh /
+ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN \
+    apt-get update && \
+    apt-get install -y supervisor && \
+    apt-get install -y gnupg2 && \
+    apt-get install -y ca-certificates && \
+    apt-get install -y wget
+
+# mongodb is not yet available in bionic and needs libcurl3
+RUN \
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4 && \
+    echo "deb [ arch=arm64 ] https://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/4.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.0.list && \
+    apt-get update && \
+    apt-get install -y libcurl3 && \
+    apt-get install -y mongodb-org && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir db
+
+RUN \
+    wget https://jaist.dl.sourceforge.net/project/leanote-bin/${LEANOTE_VERSION}/leanote-linux-arm-v${LEANOTE_VERSION}.bin.tar.gz && \
+    tar -zxvf leanote-linux-arm-v${LEANOTE_VERSION}.bin.tar.gz -C / && \
+    rm leanote-linux-arm-v${LEANOTE_VERSION}.bin.tar.gz && \
+    cp /leanote/conf/app.conf /leanote_app_backup.conf && \
+    rm /leanote/conf/app.conf && \
+    chmod a+x /init.sh && \
+    chmod a+x /leanote/bin/run.sh
+
+# leanote app conf FILE
+# if not mounted, will use default app.conf
+# VOLUME /leanote/conf/app.conf
+
+# mongo db data directory
+VOLUME /db
+# leanote attachment files directory
+VOLUME /leanote/files
+# leanote public upload directory
+VOLUME /leanote/public/upload
+
+
+EXPOSE 9000
+
+CMD ["/usr/bin/supervisord"]
